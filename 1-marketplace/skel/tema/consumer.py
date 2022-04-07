@@ -7,6 +7,7 @@ March 2021
 """
 
 from threading import Thread
+import time
 
 
 class Consumer(Thread):
@@ -52,14 +53,19 @@ class Consumer(Thread):
                 product = operation["product"]
                 contor = 0
                 while contor < quantity:
-                    if methods[my_type](id_cart, product):
-                        contor = contor + 1
+                    if my_type == "add":
+                        if self.marketplace.add_to_cart(id_cart, product):
+                            contor = contor + 1
+                        else:
+                            time.sleep(self.retry_wait_time)
                     else:
-                        time.sleep(self.retry_wait_time)
+                        self.marketplace.remove_from_cart(id_cart, product)
+                        contor = contor + 1
+                     
             placed_order = self.marketplace.place_order(id_cart)
 
-            for each_p in place_order:
-                print(self.name + " bought " + each_p)
+            for each_p in placed_order:
+                print("{} bought {}".format(self.name, each_p))
 
                 
 
