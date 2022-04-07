@@ -49,4 +49,3 @@ class Producer(Thread):
                         contor = contor + 1
                     else:
                         time.sleep(self.republish_wait_time)
-            

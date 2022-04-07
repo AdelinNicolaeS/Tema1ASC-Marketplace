@@ -8,7 +8,7 @@ March 2021
 
 from threading import Thread
 import time
-
+import sys
 
 class Consumer(Thread):
     """
@@ -36,14 +36,12 @@ class Consumer(Thread):
         self.carts = carts
         self.marketplace = marketplace
         self.retry_wait_time = retry_wait_time
-        self.name = kwargs["name"]
-        
+        self.name = kwargs.get("name")
 
     def run(self):
         methods = {}
         methods["add"] = self.marketplace.add_to_cart
         methods["remove"] = self.marketplace.remove_from_cart
-        
         for cart in self.carts:
             id_cart = self.marketplace.new_cart()
 
@@ -61,12 +59,8 @@ class Consumer(Thread):
                     else:
                         self.marketplace.remove_from_cart(id_cart, product)
                         contor = contor + 1
-                     
             placed_order = self.marketplace.place_order(id_cart)
-
             for each_p in placed_order:
-                print("{} bought {}".format(self.name, each_p))
-
+                sys.stdout.flush()
+                print(f"{self.name} bought {each_p}")
                 
-
-

@@ -7,11 +7,16 @@ Computer Systems Architecture Course
 Assignment 1
 March 2021
 """
-
+import unittest
 from threading import Lock
 from time import gmtime
+
 import logging
 from logging.handlers import RotatingFileHandler
+
+from tema.producer import Producer
+from tema.consumer import Consumer
+from tema.product import Coffee, Tea
 
 logging.basicConfig(handlers=[
     RotatingFileHandler('marketplace.log', maxBytes=100000, backupCount=10)
@@ -38,8 +43,8 @@ class Marketplace:
         """
 
         logger.info(
-            'The marketplace {} with maximum queue of {} is initializing...'.
-            format(self, queue_size_per_producer))
+            'The marketplace %s with maximum queue of %s is initializing...',
+            self, queue_size_per_producer)
         self.queue_size_per_producer = queue_size_per_producer
         self.product_to_producer = {}
         self.producer_to_products = {}
@@ -59,11 +64,12 @@ class Marketplace:
         Returns an id for the producer that calls this.
         """
 
-        logger.info(f'Starting producer registration by {self}...')
+        logger.info('Starting producer registration by %s...', self)
         with self.lock_register:
             self.producer_to_products[self.producer_counter] = []
             self.producer_counter += 1
-            logger.info(f'Producer with id: {self.producer_counter - 1} was created!')
+            logger.info('Producer with id: %d was created!',
+                        self.producer_counter - 1)
             return self.producer_counter - 1
 
     def publish(self, producer_id, product):
@@ -79,11 +85,11 @@ class Marketplace:
         :returns True or False. If the caller receives False, it should wait and then try again.
         """
 
-        logger.info(
-            f'Providing product {product} by producer {producer_id} to marketplace {self}...')
+        logger.info("Providing product %s by producer %s to marketplace %s...",
+                    product, producer_id, self)
         with self.lock_maximum_elements:
             if len(self.producer_to_products[producer_id]) \
-                > self.queue_size_per_producer:
+                >= self.queue_size_per_producer:
                 logger.info('Providing product failed!')
                 return False
             self.producer_to_products[producer_id].append(product)
@@ -99,11 +105,11 @@ class Marketplace:
         """
 
         with self.lock_cart_size:
-            logger.info(f'Creating new cart by marketplace {self}...')
+            logger.info('Creating new cart by marketplace %s...', self)
             self.carts[self.cart_counter] = []
             self.cart_counter += 1
-            logger.info(
-                f'A new cart with id {self.cart_counter - 1} was created!')
+            logger.info('A new cart with id %d was created!',
+                        self.cart_counter - 1)
         return self.cart_counter - 1
 
     def add_to_cart(self, cart_id, product):
@@ -119,8 +125,8 @@ class Marketplace:
         :returns True or False. If the caller receives False, it should wait and then try again
         """
 
-        logger.info(
-            f'Adding product {product} in the cart {cart_id} using marketplace {self}...')
+        logger.info('Adding product %s in the cart %s using marketplace %s...',
+                    product, cart_id, self)
         all_producers = self.producer_to_products.keys()
         for producer in all_producers:
             number_of_products = \
@@ -145,7 +151,8 @@ class Marketplace:
         """
 
         logger.info(
-            f'Removing product {product} from the cart {cart_id} using marketplace {self}...')
+            'Removing product %s from the cart %s using marketplace %s...',
+            product, cart_id, self)
         producer = self.product_to_producer[product]
         with self.lock_remove_from:
             self.carts[cart_id].remove(product)
@@ -160,7 +167,123 @@ class Marketplace:
         :param cart_id: id cart
         """
 
-        logger.info(f'Placing a new order from cart {cart_id} using marketplace {self}')
+        logger.info('Placing a new order from cart %s using marketplace %s',
+                    cart_id, self)
         final_order = self.carts.pop(cart_id, None)
-        logger.info(f'The order {final_order} was provided!')
+        logger.info('The order %s was provided!', final_order)
         return final_order
+
+
+class TestMarketplace(unittest.TestCase):
+    """Class that tests the whole process created by Marketplace"""
+
+    def setUp(self):
+        """Initialization for main attributes of class"""
+        self.size_marketplace = 2
+
+        self.marketplace = Marketplace(self.size_marketplace)
+        self.consumer0 = Consumer(carts=[],
+                                  marketplace=self.marketplace,
+                                  retry_wait_time=100,
+                                  kwargs=dict({"name": "consumer0"}))
+        self.consumer1 = Consumer(carts=[],
+                                  marketplace=self.marketplace,
+                                  retry_wait_time=250,
+                                  kwargs=dict({"name": "consumer1"}))
+        self.product0 = Coffee('Arabica', 12, 6, 'MEDIUM')
+        self.product1 = Coffee('Cappucino', 10, 12, 'LOW')
+        self.product2 = Tea('Complex', 9, 'White')
+        self.product3 = Tea('Honey tea', 11, 'Sweet')
+        self.producer0 = Producer(products=[],
+                                  marketplace=self.marketplace,
+                                  republish_wait_time=120,
+                                  kwargs={})
+        self.producer1 = Producer(products=[],
+                                  marketplace=self.marketplace,
+                                  republish_wait_time=176,
+                                  kwargs={})
+
+    def test___init__(self):
+        """Test function which tests if __init__ runs correctly"""
+        self.assertEqual(self.marketplace.queue_size_per_producer,
+                         self.size_marketplace)
+        self.assertEqual(self.marketplace.cart_counter, 0)
+        self.assertEqual(self.marketplace.producer_counter, 2)
+        self.assertEqual(self.producer0.id_producer, 0)
+        self.assertEqual(self.producer1.id_producer, 1)
+
+    def test_register_producer(self):
+        """Test function which tests if register_producer runs correctly"""
+        self.assertEqual(self.marketplace.register_producer(), 2)
+        self.assertEqual(self.marketplace.producer_counter, 3)
+
+    def test_publish(self):
+        """Test function which tests if publish runs correctly"""
+        self.assertEqual(self.marketplace.publish(0, self.product1), True)
+        self.assertEqual(self.marketplace.publish(0, self.product2), True)
+        self.assertEqual(self.marketplace.publish(0, self.product3), False)
+        self.assertEqual(self.marketplace.publish(1, self.product0), True)
+        self.assertEqual(self.marketplace.publish(1, self.product3), True)
+
+    def test_new_cart(self):
+        """Test function which tests if new_cart runs correctly"""
+        self.assertEqual(self.marketplace.new_cart(), 0)
+        self.assertEqual(self.marketplace.new_cart(), 1)
+        self.assertEqual(self.marketplace.new_cart(), 2)
+
+    def test_add_to_cart(self):
+        """Test function which tests if add_to_cart runs correctly"""
+        self.marketplace.new_cart()
+        self.marketplace.new_cart()
+        self.marketplace.new_cart()
+        self.marketplace.publish(0, self.product1)
+        self.marketplace.publish(0, self.product2)
+        self.marketplace.publish(1, self.product0)
+        self.marketplace.publish(1, self.product3)
+
+        self.assertTrue(self.marketplace.add_to_cart(0, self.product0))
+        self.assertFalse(self.marketplace.add_to_cart(1, self.product0))
+        self.assertTrue(self.marketplace.add_to_cart(0, self.product1))
+        self.assertTrue(self.marketplace.add_to_cart(0, self.product3))
+        self.assertTrue(self.marketplace.add_to_cart(1, self.product2))
+
+    def test_remove_from_cart(self):
+        """Test function which tests if remove_the_cart runs correctly"""
+        self.marketplace.new_cart()
+        self.marketplace.new_cart()
+        self.marketplace.new_cart()
+        self.marketplace.publish(0, self.product1)
+        self.marketplace.publish(0, self.product2)
+        self.marketplace.publish(1, self.product0)
+        self.marketplace.publish(1, self.product3)
+        self.marketplace.add_to_cart(0, self.product0)
+        self.marketplace.add_to_cart(0, self.product1)
+        self.marketplace.add_to_cart(0, self.product3)
+        self.marketplace.add_to_cart(1, self.product2)
+
+        self.marketplace.remove_from_cart(1, self.product2)
+        self.assertFalse(self.product2 in self.marketplace.carts[1])
+
+        self.marketplace.remove_from_cart(0, self.product3)
+        self.assertFalse(self.product3 in self.marketplace.carts[0])
+
+    def test_place_order(self):
+        """Test function which tests if place_order runs correctly"""
+        self.marketplace.new_cart()
+        self.marketplace.new_cart()
+        self.marketplace.new_cart()
+        self.marketplace.publish(0, self.product1)
+        self.marketplace.publish(0, self.product2)
+        self.marketplace.publish(1, self.product0)
+        self.marketplace.publish(1, self.product3)
+        self.marketplace.add_to_cart(0, self.product0)
+        self.marketplace.add_to_cart(0, self.product1)
+        self.marketplace.add_to_cart(0, self.product3)
+        self.marketplace.add_to_cart(1, self.product2)
+        self.marketplace.remove_from_cart(1, self.product2)
+        self.marketplace.remove_from_cart(0, self.product3)
+
+        self.assertEqual(self.marketplace.place_order(0),
+                         [self.product0, self.product1])
+        self.assertEqual(len(self.marketplace.place_order(1)), 0)
+        self.assertEqual(len(self.marketplace.place_order(2)), 0)
