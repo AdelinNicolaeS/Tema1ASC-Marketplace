@@ -1,0 +1,67 @@
+Stanca Adelin-Nicolae 331CA
+
+Tema1ASC - Marketplace
+
+Pentru realizarea temei, am folosit conceptul de lock pe care am incercat sa il
+aplic in cadrul metodelor clasei Marketplace, unitatea centrala a temei. Pentru
+partea de logging am gasit informatii utile pe o resursa de pe StackOverflow al
+carei link este in interiorul clasei Marketplace. Am setat ora pentru afisarea
+informatiilor de la localtime la gmtime, iar in interiorul fiecarei metode am
+printat informatiile necesare cu privire la intrarea si la iesirea din metoda
+respectiva. Am intampinat anumite probleme la partea de logging deoarece unele
+teste au picat dupa ce am introdus aceasta functionalitate, insa am reusit sa
+repar acest bug punand anumite logging-uri in interiorul zonei delimitate de
+lock-uri, fiind cel mai probabil o problema de sincronizare a afisarii. Pentru
+partea de unittesting, am creat clasa TestMarketplace pe care am rulat-o cu
+ajutorul comenzii de pe ocw. Logica pe care am urmarit-o a fost sa creez cativa
+produceri si consumeri, un marketplace si cateva produse, dupa care in fiecare
+metoda de test sa imi simulez anumite contexte in functie de functionalitatea
+testata. A rezultat destul de mult cod duplicat, insa consider ca a reiesit ca
+metodele implementate anterior au fost (in cele din urma) corecte. Pe partea
+de erori de coding style, am avut o problema cu importul claselor Producer,
+Consumer, Coffee si Tea, insa in acest moment acestea functioneaza atunci cand
+rulez comanda 'python3 -m unittest marketplace.py' in fisierul tema, unde se
+aflau toate fisierele py. Pentru versionarea temei, am folosit Github, atasand
+folder .git in arhiva temei. Pentru alte probleme legate de rulare, pot fi
+contactat oricand :)
+
+Clasa Marketplace: centrul implementarii, am incercat sa respect cerintele
+pe cat posibil si sa am o rezolvare cursiva, insa am avut destul de multe batai
+de cap cu implementarea deoarece nu am folosit Python extrem de mult inainte,
+la care s-au adaugat si probleme de sincronizare pe care le-am rezolvat destul
+de greu. In functia __init__, mi-am definit, pe langa lungimea maxima a cozii,
+3 dictionare pentru a mapa si manevra mai usor datele. Am si 2 variabile pentru
+numarul de cart-uri si producatori, variabile pe care am vrut sa le inlocuiesc
+cu lungimea dictionarelor, insa am avut probleme de sincronizare in absenta lor,
+asa ca am ales sa le pastrez, desi par redundante. In register_producer(), in
+cadrul unui lock incrementez numarul de producers si asignez un nou id pentru
+a fi folosit in celelalte clase. In metoda publish(), verific daca producerul
+la care se face referire mai poate avea un nou produs in lista sa, returnand
+fals sau adevarat dupa caz. Daca mai poate avea un produs, modific cele 2
+dictionare care marcheaza relatia dintre cele 2 entitati. Pentru new_cart(), am
+repetat ideea de la register_producer().
+Metodele add_to_cart() si remove_from_cart() au fost cel mai dificil de
+implementat, mergand practic impreuna in cadrul rezolvarii. Pentru remove, am
+folosit dictionarul product_to_producer pentru a gasi producatorul corect si
+a face modificarile din structurile interne ale clasei, in timp ce pentru
+metoda de add am fost nevoit sa fac o parcurgere a tuturor producerilor pentru
+a putea realiza aceasta operatie, probabil aceasta fiind cea mai mare problema
+pe care am intampinat-o pentru rezolvarea taskurilor.
+Metoda place_order se realizeaza prin simpla selectare din cadrul dictionarului
+carts a informatiilor necesare, alaturi de stergerea acelui cart din structura
+de date.
+
+Clasa Producer: in metoda de initializare, i-am alocat un id folosind functia de
+generare de id din marketplace-ul dat ca parametru la creare. Pentru implementarea
+metodei de run(), am parcurs in cadrul unui while infinit, pentru a simula
+paralelismul, fiecare tuplu de produs primit si am incercat sa il adaugam la
+marketplace-ul nostru in cantitatea ceruta, respectand timpul necesar de asteptare
+daca operatia esueaza.
+
+Clasa Consumer: in cadrul metodei de run(), am parcurs fiecare cart_op primit din
+initializare, extragandu-i cantitatea, tipul de operatie si produsul, dupa care
+am incercat sa realizez operatia ceruta de 'quantity' ori, in cazul operatiei de
+add fiind tratat si cazul in care apar situatii de fail si este necesara repetarea
+acesteia dupa o perioada de asteptare. La final, extrag comanda finala pe care o
+afisez, avand nevoie sa dau un flush la fiecare print deoarece am observat ca se
+pastreaza junk bytes din cauza carora imi puteau pica teste.

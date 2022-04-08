@@ -18,6 +18,8 @@ from tema.producer import Producer
 from tema.consumer import Consumer
 from tema.product import Coffee, Tea
 
+# https://stackoverflow.com/questions/40088496/how-to-use-pythons-rotatingfilehandler
+
 logging.basicConfig(handlers=[
     RotatingFileHandler('marketplace.log', maxBytes=100000, backupCount=10)
 ],
@@ -46,9 +48,9 @@ class Marketplace:
             'The marketplace %s with maximum queue of %s is initializing...',
             self, queue_size_per_producer)
         self.queue_size_per_producer = queue_size_per_producer
-        self.product_to_producer = {}
-        self.producer_to_products = {}
-        self.carts = {}
+        self.product_to_producer = {} # dictionary for (product, producer_id)
+        self.producer_to_products = {} # dictionary for (producer_id, [product1, product2, ...])
+        self.carts = {} # dictionary for (cart_id, [product1, product2, ...])
         self.cart_counter = 0
         self.producer_counter = 0
 
@@ -66,6 +68,7 @@ class Marketplace:
 
         logger.info('Starting producer registration by %s...', self)
         with self.lock_register:
+            # using lock to increment atomically producer_counter
             self.producer_to_products[self.producer_counter] = []
             self.producer_counter += 1
             logger.info('Producer with id: %d was created!',
@@ -88,6 +91,7 @@ class Marketplace:
         logger.info("Providing product %s by producer %s to marketplace %s...",
                     product, producer_id, self)
         with self.lock_maximum_elements:
+            # using lock to get and compare correctly the lengths
             if len(self.producer_to_products[producer_id]) \
                 >= self.queue_size_per_producer:
                 logger.info('Providing product failed!')
@@ -105,6 +109,7 @@ class Marketplace:
         """
 
         with self.lock_cart_size:
+            # using lock to increment atomically cart_counter
             logger.info('Creating new cart by marketplace %s...', self)
             self.carts[self.cart_counter] = []
             self.cart_counter += 1
@@ -127,11 +132,14 @@ class Marketplace:
 
         logger.info('Adding product %s in the cart %s using marketplace %s...',
                     product, cart_id, self)
+        # take all the producers from map
         all_producers = self.producer_to_products.keys()
         for producer in all_producers:
             number_of_products = \
                 self.producer_to_products[producer].count(product)
+            # if product is created by this producer
             if number_of_products > 0:
+                # put it in the cart and remove from product's list
                 self.carts[cart_id].append(product)
                 self.producer_to_products[producer].remove(product)
                 logger.info('Adding a new product ended successfully!')
@@ -153,6 +161,7 @@ class Marketplace:
         logger.info(
             'Removing product %s from the cart %s using marketplace %s...',
             product, cart_id, self)
+        # taking producer using our dictionary
         producer = self.product_to_producer[product]
         with self.lock_remove_from:
             self.carts[cart_id].remove(product)
@@ -169,6 +178,7 @@ class Marketplace:
 
         logger.info('Placing a new order from cart %s using marketplace %s',
                     cart_id, self)
+        # take the information from cart and remove the cart from dictionary
         final_order = self.carts.pop(cart_id, None)
         logger.info('The order %s was provided!', final_order)
         return final_order

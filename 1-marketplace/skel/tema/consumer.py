@@ -39,9 +39,6 @@ class Consumer(Thread):
         self.name = kwargs.get("name")
 
     def run(self):
-        methods = {}
-        methods["add"] = self.marketplace.add_to_cart
-        methods["remove"] = self.marketplace.remove_from_cart
         for cart in self.carts:
             id_cart = self.marketplace.new_cart()
 
@@ -51,16 +48,19 @@ class Consumer(Thread):
                 product = operation["product"]
                 contor = 0
                 while contor < quantity:
+                    # we apply add until it succeds 'quantity' times
                     if my_type == "add":
                         if self.marketplace.add_to_cart(id_cart, product):
                             contor = contor + 1
                         else:
                             time.sleep(self.retry_wait_time)
+                    # just applying remove 'quantity' times
                     else:
                         self.marketplace.remove_from_cart(id_cart, product)
                         contor = contor + 1
             placed_order = self.marketplace.place_order(id_cart)
             for each_p in placed_order:
+                # flush necessary to get rid of junk data
                 sys.stdout.flush()
                 print(f"{self.name} bought {each_p}")
                 

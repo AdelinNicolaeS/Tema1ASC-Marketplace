@@ -44,8 +44,10 @@ class Producer(Thread):
             for product in products:
                 contor = 0
                 while contor < product[1]:
+                    # try to succed all the publish operations
                     if self.marketplace.publish(self.id_producer, product[0]):
                         time.sleep(product[2])
                         contor = contor + 1
+                    #if it didn't work, try again after a wait time
                     else:
                         time.sleep(self.republish_wait_time)
